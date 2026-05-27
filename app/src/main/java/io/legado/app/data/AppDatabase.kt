@@ -39,11 +39,13 @@ import io.legado.app.data.entities.KeyboardAssist
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReplaceRule
 import io.legado.app.data.entities.RuleSub
-
 import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.data.entities.Server
 import io.legado.app.data.entities.TxtTocRule
 import io.legado.app.help.DefaultData
+import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.storage.Backup
+import kotlinx.coroutines.Dispatchers
 import org.intellij.lang.annotations.Language
 import splitties.init.appCtx
 import java.util.Locale
@@ -120,7 +122,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract val cacheDao: CacheDao
     abstract val ruleSubDao: RuleSubDao
     abstract val dictRuleDao: DictRuleDao
-    abstract val keyboardAssistsDao: KeyboardAssistsDao
+    abstract val keyboardAssistsDao: KeyboardAssistDao
     abstract val serverDao: ServerDao
 
     companion object {
@@ -129,6 +131,9 @@ abstract class AppDatabase : RoomDatabase() {
 
         const val BOOK_TABLE_NAME = "books"
         const val BOOK_SOURCE_TABLE_NAME = "book_sources"
+
+        @Volatile
+        private var dbVersion: Int = -1
 
         val dbCallback = object : Callback() {
 
@@ -155,6 +160,9 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
             override fun onOpen(db: SupportSQLiteDatabase) {
+                // 检查数据库版本变化，必要时备份
+                checkDbVersionAndBackup(db)
+                
                 @Language("sql")
                 val insertBookGroupAllSql = """
                     insert into book_groups(groupId, groupName, 'order', show) 
@@ -186,7 +194,7 @@ abstract class AppDatabase : RoomDatabase() {
                 @Language("sql")
                 val insertBookGroupLocalNoneGroupSql = """
                     insert into book_groups(groupId, groupName, 'order', show) 
-                    select ${BookGroup.IdLocalNone}, '本地未分组', -6, 0
+                    select ${BookGroup.IdLocalNone}, '本地未分组', -6, 0, 1
                     where not exists (select * from book_groups where groupId = ${BookGroup.IdLocalNone})
                 """.trimIndent()
                 db.execSQL(insertBookGroupLocalNoneGroupSql)
@@ -224,6 +232,44 @@ abstract class AppDatabase : RoomDatabase() {
                                 contentValues
                             )
                         }
+                    }
+                }
+            }
+
+            override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
+                Log.d("AppDatabaseCallback", "数据库将进行破坏性迁移，执行备份")
+                backupBeforeMigration()
+            }
+
+            private fun checkDbVersionAndBackup(db: SupportSQLiteDatabase) {
+                try {
+                    val currentDbVersion = db.version
+                    Log.d("AppDatabaseCallback", "当前数据库版本: $currentDbVersion")
+                    
+                    if (dbVersion == -1) {
+                        // 首次打开，保存当前版本
+                        dbVersion = currentDbVersion
+                        return
+                    }
+                    
+                    if (dbVersion < currentDbVersion) {
+                        // 数据库版本增加了，说明进行了迁移
+                        Log.d("AppDatabaseCallback", "检测到数据库版本变化: $dbVersion -> $currentDbVersion，执行备份")
+                        backupBeforeMigration()
+                        dbVersion = currentDbVersion
+                    }
+                } catch (e: Exception) {
+                    Log.e("AppDatabaseCallback", "检查数据库版本失败", e)
+                }
+            }
+
+            private fun backupBeforeMigration() {
+                Coroutine.async(Dispatchers.IO) {
+                    try {
+                        Backup.backupLocked(appCtx, null)
+                        Log.d("AppDatabaseCallback", "数据库迁移前备份完成")
+                    } catch (e: Exception) {
+                        Log.e("AppDatabaseCallback", "数据库迁移前备份失败", e)
                     }
                 }
             }

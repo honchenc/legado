@@ -10,11 +10,14 @@ import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.storage.Backup
 import io.legado.app.model.BookCover
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonArray
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.printOnDebug
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import splitties.init.appCtx
 import java.io.File
 
@@ -23,6 +26,8 @@ object DefaultData {
     fun upVersion() {
         if (LocalConfig.versionCode < AppConst.appInfo.versionCode) {
             Coroutine.async {
+                // 先执行备份
+                backupBeforeUpdate()
                 if (LocalConfig.needUpHttpTTS) {
                     importDefaultHttpTTS()
                 }
@@ -32,9 +37,19 @@ object DefaultData {
                 if (LocalConfig.needUpDictRule) {
                     importDefaultDictRules()
                 }
+                // 更新本地版本号
+                LocalConfig.versionCode = AppConst.appInfo.versionCode
             }.onError {
                 it.printOnDebug()
             }
+        }
+    }
+
+    private suspend fun backupBeforeUpdate() = withContext(Dispatchers.IO) {
+        try {
+            Backup.backupLocked(appCtx, null)
+        } catch (e: Exception) {
+            e.printOnDebug()
         }
     }
 
@@ -51,7 +66,7 @@ object DefaultData {
 
     val readConfigs: List<ReadBookConfig.Config> by lazy {
         val json = String(
-            appCtx.assets.open("defaultData${File.separator}${ReadBookConfig.configFileName}")
+            appCtx.assets.open("defaultData${File.separator}${ReadBookConfig.configFileName")
                 .readBytes()
         )
         GSON.fromJsonArray<ReadBookConfig.Config>(json).getOrNull()
