@@ -18,6 +18,7 @@ room {
 }
 
 android {
+    ndkVersion = "27.3.13750724"
     compileSdk = compile_sdk_version
     namespace = 'io.legado.app'
     kotlin {

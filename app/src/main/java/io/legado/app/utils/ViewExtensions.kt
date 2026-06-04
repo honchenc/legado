@@ -67,7 +67,12 @@ fun View.hideSoftInput() = run {
 
 fun EditText.showSoftInput() = run {
     requestFocus()
-    inputMethodManager.showSoftInput(this, InputMethodManager.SHOW_FORCED)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        inputMethodManager.showSoftInput(this, 0)
+    } else {
+        @Suppress("DEPRECATION")
+        inputMethodManager.showSoftInput(this, InputMethodManager.SHOW_FORCED)
+    }
 }
 
 fun View.disableAutoFill() = run {

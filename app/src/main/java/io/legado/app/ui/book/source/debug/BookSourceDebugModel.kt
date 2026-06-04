@@ -18,7 +18,6 @@ class BookSourceDebugModel(application: Application) : BaseViewModel(application
     var reviewSrc: String? = null
 
     fun init(sourceUrl: String?, finally: () -> Unit) {
-        //优先使用这个，不会抛出异常
         execute {
             bookSource = IntentData.source as? BookSource
             bookSource ?: sourceUrl?.let { appDb.bookSourceDao.getBookSource(it) }
@@ -57,5 +56,4 @@ class BookSourceDebugModel(application: Application) : BaseViewModel(application
         super.onCleared()
         Debug.cancelDebug(true)
     }
-
 }

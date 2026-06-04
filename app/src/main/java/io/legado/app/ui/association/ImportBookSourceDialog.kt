@@ -33,6 +33,7 @@ import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.putPrefBoolean
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.viewbindingdelegate.viewBinding
+import io.legado.app.utils.gone
 import io.legado.app.utils.visible
 import splitties.views.onClick
 
@@ -251,6 +252,14 @@ class ImportBookSourceDialog() : BaseDialogFragment(R.layout.dialog_recycler_vie
                     item.lastUpdateTime > localSource.lastUpdateTime -> "更新"
                     else -> "已有"
                 }
+                item.bookSourceComment?.let {
+                    if (it.isNotBlank()) {
+                        tvSourceComment.text = it
+                        tvSourceComment.visible()
+                    } else {
+                        tvSourceComment.gone()
+                    }
+                } ?: tvSourceComment.gone()
             }
         }
 

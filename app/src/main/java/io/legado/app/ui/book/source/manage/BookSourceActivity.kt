@@ -6,6 +6,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.SubMenu
 import android.view.WindowManager
+import android.widget.EditText
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
@@ -53,7 +54,6 @@ import io.legado.app.ui.widget.recycler.ItemTouchCallback
 import io.legado.app.utils.ACache
 import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.applyTint
-import io.legado.app.utils.cnCompare
 import io.legado.app.utils.dpToPx
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChange
 import io.legado.app.utils.flowWithLifecycleAndDatabaseChangeFirst
@@ -324,24 +324,7 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
                             .thenBy { getSourceHost(it.bookSourceUrl) }
                             .thenByDescending { it.lastUpdateTime })
                 } else {
-                    val tmp = when (sort) {
-                        BookSourceSort.Weight -> data.sortedBy { it.weight }
-                        BookSourceSort.Name -> data.sortedWith { o1, o2 ->
-                            o1.bookSourceName.cnCompare(o2.bookSourceName)
-                        }
-                        BookSourceSort.Url -> data.sortedBy { it.bookSourceUrl }
-                        BookSourceSort.Update -> data.sortedByDescending { it.lastUpdateTime }
-                        BookSourceSort.Respond -> data.sortedBy { it.respondTime }
-                        BookSourceSort.Enable -> data.sortedWith { o1, o2 ->
-                            var sort = -o1.enabled.compareTo(o2.enabled)
-                            if (sort == 0) {
-                                sort = o1.bookSourceName.cnCompare(o2.bookSourceName)
-                            }
-                            sort
-                        }
-                        else -> data.sortedBy { it.customOrder }
-                    }
-                    if (!sortAscending) tmp.reversed() else tmp
+                    SourceSorter.sort(data, sort, sortAscending)
                 }
             }.flowWithLifecycleAndDatabaseChange(
                 lifecycle,
@@ -546,7 +529,6 @@ class BookSourceActivity : VMBaseActivity<ActivityBookSourceBinding, BookSourceV
         }
     }
 
-    @SuppressLint("InflateParams")
     private fun showImportDialog() {
         val aCache = ACache.get(cacheDir = false)
         val cacheUrls: MutableList<String> = aCache

@@ -10,7 +10,6 @@ import io.legado.app.data.entities.toBookSource
 import io.legado.app.help.source.SourceHelp
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.GSON
-import io.legado.app.utils.cnCompare
 import io.legado.app.utils.outputStream
 import io.legado.app.utils.splitNotBlank
 import io.legado.app.utils.stackTraceStr
@@ -169,24 +168,7 @@ class BookSourceViewModel(application: Application) : BaseViewModel(application)
     ): List<BookSource> {
         return appDb.bookSourceDao.getBookSourcesFix(selection.map { it.bookSourceUrl })
         .let { data ->
-            val tmp = when (sort) {
-                BookSourceSort.Weight -> data.sortedBy { it.weight }
-                BookSourceSort.Name -> data.sortedWith { o1, o2 ->
-                    o1.bookSourceName.cnCompare(o2.bookSourceName)
-                }
-                BookSourceSort.Url -> data.sortedBy { it.bookSourceUrl }
-                BookSourceSort.Update -> data.sortedByDescending { it.lastUpdateTime }
-                BookSourceSort.Respond -> data.sortedBy { it.respondTime }
-                BookSourceSort.Enable -> data.sortedWith { o1, o2 ->
-                    var sortNum = -o1.enabled.compareTo(o2.enabled)
-                    if (sortNum == 0) {
-                        sortNum = o1.bookSourceName.cnCompare(o2.bookSourceName)
-                    }
-                    sortNum
-                }
-                else -> data
-            }
-            if (!sortAscending) tmp.reversed() else tmp
+            SourceSorter.sort(data, sort, sortAscending)
         }
     }
 

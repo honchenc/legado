@@ -13,6 +13,7 @@ import io.legado.app.utils.ChineseUtils
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
+
 class SearchContentViewModel(application: Application) : BaseViewModel(application) {
     var bookUrl: String = ""
     var book: Book? = null
@@ -22,6 +23,7 @@ class SearchContentViewModel(application: Application) : BaseViewModel(applicati
     val cacheChapterNames = hashSetOf<String>()
     val searchResultList: MutableList<SearchResult> = mutableListOf()
     var replaceEnabled = false
+    var useRegex = false
 
     fun initBook(success: () -> Unit) {
         execute {
@@ -52,18 +54,24 @@ class SearchContentViewModel(application: Application) : BaseViewModel(applicati
         val mContent = contentProcessor!!.getContent(
             book, chapter, chapterContent, useReplace = replaceEnabled
         ).toString()
-        val positions = searchPosition(mContent, query)
-        positions.forEachIndexed { index, position ->
+        val positions = SearchUtil.searchPosition(mContent, query, useRegex)
+        positions.forEachIndexed { index, (startPos, endPos) ->
             currentCoroutineContext().ensureActive()
-            val construct = getResultAndQueryIndex(mContent, position, query)
+            val matchedText = if (useRegex) {
+                mContent.substring(startPos, endPos)
+            } else {
+                query
+            }
+            val construct = getResultAndQueryIndex(mContent, startPos, matchedText)
             val result = SearchResult(
                 resultCountWithinChapter = index,
                 resultText = construct.second,
                 chapterTitle = chapter.title,
                 query = query,
+                matchedText = matchedText,
                 chapterIndex = chapter.index,
                 queryIndexInResult = construct.first,
-                queryIndexInChapter = position
+                queryIndexInChapter = startPos
             )
             searchResultsWithinChapter.add(result)
         }
@@ -71,21 +79,10 @@ class SearchContentViewModel(application: Application) : BaseViewModel(applicati
         return searchResultsWithinChapter
     }
 
-    private suspend fun searchPosition(content: String, pattern: String): List<Int> {
-        val position: MutableList<Int> = mutableListOf()
-        var index = content.indexOf(pattern)
-        while (index >= 0) {
-            currentCoroutineContext().ensureActive()
-            position.add(index)
-            index = content.indexOf(pattern, index + pattern.length)
-        }
-        return position
-    }
-
     private fun getResultAndQueryIndex(
         content: String,
         queryIndexInContent: Int,
-        query: String
+        matchedText: String
     ): Pair<Int, String> {
         // 左右移动20个字符，构建关键词周边文字，在搜索结果里显示
         // 判断段落，只在关键词所在段落内分割
@@ -93,7 +90,7 @@ class SearchContentViewModel(application: Application) : BaseViewModel(applicati
         // length和设置结合，自由调整周边文字长度
         val length = 20
         var po1 = queryIndexInContent - length
-        var po2 = queryIndexInContent + query.length + length
+        var po2 = queryIndexInContent + matchedText.length + length
         if (po1 < 0) {
             po1 = 0
         }

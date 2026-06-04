@@ -10,6 +10,7 @@ data class SearchResult(
     val resultText: String = "",
     val chapterTitle: String = "",
     val query: String = "",
+    val matchedText: String? = null,
     val pageSize: Int = 0,
     val chapterIndex: Int = 0,
     val pageIndex: Int = 0,
@@ -19,10 +20,11 @@ data class SearchResult(
 
     fun getHtmlCompat(textColor: String, accentColor: String): Spanned {
         return if (query.isNotBlank()) {
-            val queryIndexInSurrounding = resultText.indexOf(query)
+            val highlightText = matchedText ?: query
+            val queryIndexInSurrounding = resultText.indexOf(highlightText)
             val leftString = resultText.take(queryIndexInSurrounding)
             val rightString =
-                resultText.substring(queryIndexInSurrounding + query.length, resultText.length)
+                resultText.substring(queryIndexInSurrounding + highlightText.length, resultText.length)
             
             // 检查是否为墨水屏模式
             val html = if (AppConfig.isEInkMode) {
@@ -31,7 +33,7 @@ data class SearchResult(
                     append("<u>${chapterTitle}</u>")
                     append("<br>")
                     append(leftString)
-                    append("<u>${query}</u>")
+                    append("<u>${highlightText}</u>")
                     append(rightString)
                 }
             } else {
@@ -40,7 +42,7 @@ data class SearchResult(
                     append(chapterTitle.colorTextForHtml(accentColor))
                     append("<br>")
                     append(leftString.colorTextForHtml(textColor))
-                    append(query.colorTextForHtml(accentColor))
+                    append(highlightText.colorTextForHtml(accentColor))
                     append(rightString.colorTextForHtml(textColor))
                 }
             }

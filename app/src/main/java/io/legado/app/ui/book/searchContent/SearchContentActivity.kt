@@ -83,6 +83,7 @@ class SearchContentActivity :
 
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
         menu.findItem(R.id.menu_enable_replace)?.isChecked = viewModel.replaceEnabled
+        menu.findItem(R.id.menu_enable_regex)?.isChecked = viewModel.useRegex
         return super.onMenuOpened(featureId, menu)
     }
 
@@ -91,6 +92,13 @@ class SearchContentActivity :
             R.id.menu_enable_replace -> {
                 viewModel.replaceEnabled = !viewModel.replaceEnabled
                 item.isChecked = viewModel.replaceEnabled
+            }
+            R.id.menu_enable_regex -> {
+                viewModel.useRegex = !viewModel.useRegex
+                item.isChecked = viewModel.useRegex
+                if (viewModel.lastQuery.isNotBlank()) {
+                    startContentSearch(viewModel.lastQuery)
+                }
             }
         }
         return super.onCompatOptionsItemSelected(item)

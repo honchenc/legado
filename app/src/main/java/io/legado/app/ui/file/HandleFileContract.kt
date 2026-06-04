@@ -1,6 +1,7 @@
 package io.legado.app.ui.file
 
 import android.net.Uri
+import android.os.Build
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentManager
@@ -62,8 +63,14 @@ class HandleFileLauncher(
             param.allowExtensions = arrayOf("jpg", "png", "bmp", "webp")
         }
         fragmentManager.setFragmentResultListener("handleFile", lifecycleOwner) { _, bundle ->
+            val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                bundle.getParcelable("result", Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                bundle.getParcelable("result")
+            }
             val result = HandleFileContract.Result(
-                bundle.getParcelable("result"),
+                uri,
                 bundle.getInt("requestCode"),
                 bundle.getString("value")
             )

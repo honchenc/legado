@@ -54,6 +54,7 @@ import io.legado.app.utils.get
 import io.legado.app.utils.isJson
 import io.legado.app.utils.isXml
 import kotlinx.coroutines.runBlocking
+import okhttp3.Dns
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -61,7 +62,9 @@ import okhttp3.Response
 import okio.Buffer
 import java.io.InputStream
 import java.lang.reflect.Type
+import java.net.InetAddress
 import java.net.URLEncoder
+import java.net.UnknownHostException
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
@@ -243,6 +246,7 @@ class AnalyzeUrl(
                 ?: GSON.fromJsonObject<UrlOption>(urlOptionStr).getOrNull()?.also {
                     log("链接参数 JSON 格式不规范，请改为规范格式")
                 }
+<<<<<<< HEAD
             option?.let { opt ->
                 opt.headers?.forEach { (k, v) -> headerMap[k] = v.toString() }
                 opt.js?.let { jsStr -> evalJS(jsStr, url)?.toString()?.let { url = it } }
@@ -465,14 +469,28 @@ class AnalyzeUrl(
 
     private fun getClient(): OkHttpClient {
         val client = getProxyClient(proxy)
-        if (readTimeout == null && callTimeout == null) return client
-        return client.newBuilder().apply {
+        if (dnsIp.isNullOrBlank() && readTimeout == null && callTimeout == null) return client
+        val builder = client.newBuilder()
+        if (!dnsIp.isNullOrBlank()) {
+            val ip = dnsIp
+            builder.dns(object : Dns {
+                override fun lookup(hostname: String): List<InetAddress> {
+                    return try {
+                        listOf(InetAddress.getByName(ip))
+                    } catch (_: UnknownHostException) {
+                        Dns.SYSTEM.lookup(hostname)
+                    }
+                }
+            })
+        }
+        builder.apply {
             readTimeout?.let {
                 readTimeout(it, TimeUnit.MILLISECONDS)
                 callTimeout(max(timeLimit, it) * 2, TimeUnit.MILLISECONDS)
             }
             callTimeout?.let { callTimeout(it, TimeUnit.MILLISECONDS) }
-        }.build()
+        }
+        return builder.build()
     }
 
     @Suppress("unused")
@@ -723,6 +741,14 @@ class AnalyzeUrl(
             private fun String.parseAsJsonContainer(): JsonElement? = runCatching {
                 JsonParser.parseString(this)
             }.getOrNull()?.takeIf { it.isJsonObject || it.isJsonArray }
+        }
+
+        fun setDnsIp(value: String?) {
+            dnsIp = if (value.isNullOrBlank()) null else value
+        }
+
+        fun getDnsIp(): String? {
+            return if (dnsIp.isNullOrBlank()) null else dnsIp
         }
     }
 

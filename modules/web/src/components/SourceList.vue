@@ -1,9 +1,21 @@
 <template>
-  <input
-    class="web-input search"
-    v-model="searchKey"
-    placeholder="筛选源"
-  />
+  <div class="toolbar">
+    <input
+      class="web-input search"
+      v-model="searchKey"
+      placeholder="筛选源"
+    />
+    <select class="web-input sort-select" v-model="sortMode">
+      <option value="default">默认排序</option>
+      <option value="name">按名称</option>
+      <option value="url">按地址</option>
+      <option value="weight">按权重</option>
+      <option value="update">按更新</option>
+      <option value="respond">按响应</option>
+      <option value="enable">按启用</option>
+    </select>
+    <button class="web-btn sort-btn" @click="toggleAsc">{{ ascending ? '↑' : '↓' }}</button>
+  </div>
   <div class="tool">
     <button class="web-btn" @click="importSourceFile">打开</button>
     <button class="web-btn" :disabled="sourcesFiltered.length === 0" @click="outExport">导出</button>
@@ -12,9 +24,9 @@
   </div>
   <div id="source-list">
     <virtual-list
-      style="height: calc(100vh - 112px - 7px); overflow-y: auto; overflow-x: hidden"
+      style="height: calc(100vh - 150px); overflow-y: auto; overflow-x: hidden"
       :data-key="(source: Source) => getSourceName(source)"
-      :data-sources="sourcesFiltered"
+      :data-sources="sortedSources"
       :data-component="SourceItem"
       :estimate-size="45"
       :extra-props="{ modelValue: sourceUrlSelect }"
@@ -30,6 +42,7 @@ import {
   getSourceName,
   convertSourcesToMap,
 } from '@utils/souce'
+import { sortSources, type SortMode } from '@utils/sourceSorter'
 import VirtualList from 'vue3-virtual-scroll-list'
 import SourceItem from './SourceItem.vue'
 import { toast } from '@/utils/toast'
@@ -38,6 +51,12 @@ import type { Source } from '@/source'
 const store = useSourceStore()
 const sourceUrlSelect = ref<string[]>([])
 const searchKey = ref('')
+const sortMode = ref<SortMode>((localStorage.getItem('sourceSortMode') as SortMode) || 'default')
+const ascending = ref(localStorage.getItem('sourceSortAsc') !== 'false')
+
+watch(sortMode, v => localStorage.setItem('sourceSortMode', v))
+watch(ascending, v => localStorage.setItem('sourceSortAsc', String(v)))
+
 const sources = computed(() => store.sources)
 
 const sourcesFiltered = computed<Source[]>(() => {
@@ -45,19 +64,28 @@ const sourcesFiltered = computed<Source[]>(() => {
   if (key === '') return sources.value
   return sources.value.filter(source => isSourceMatches(source, key))
 })
+
+const sortedSources = computed<Source[]>(() => {
+  return sortSources(sourcesFiltered.value, sortMode.value, ascending.value)
+})
+
 const sourceSelect = computed<Source[]>(() => {
   const urls = sourceUrlSelect.value
   if (urls.length == 0) return []
   const sourcesFilteredMap =
     searchKey.value == ''
       ? store.sourcesMap
-      : convertSourcesToMap(sourcesFiltered.value)
+      : convertSourcesToMap(sortedSources.value)
   return urls.reduce((sources, sourceUrl) => {
     const source = sourcesFilteredMap.get(sourceUrl)
     if (source) sources.push(source)
     return sources
   }, [] as Source[])
 })
+
+function toggleAsc() {
+  ascending.value = !ascending.value
+}
 
 const deleteSelectSources = () => {
   const sourceSelectValue = sourceSelect.value
@@ -104,7 +132,7 @@ const outExport = () => {
   const exportFile = document.createElement('a')
   const sources =
       sourceUrlSelect.value.length === 0
-        ? sourcesFiltered.value
+        ? sortedSources.value
         : sourceSelect.value
 
   exportFile.download = `BookSource_${Date()
@@ -121,13 +149,27 @@ const outExport = () => {
 </script>
 
 <style lang="scss" scoped>
+.toolbar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.search {
+  flex: 1;
+  margin-bottom: 0;
+}
+.sort-select {
+  width: 110px;
+  margin-bottom: 0;
+}
+.sort-btn {
+  width: 36px;
+  padding: 0;
+}
 .tool {
   display: flex;
   gap: 6px;
   margin: 4px 0;
   justify-content: center;
-}
-.search {
-  margin-bottom: 0;
 }
 </style>

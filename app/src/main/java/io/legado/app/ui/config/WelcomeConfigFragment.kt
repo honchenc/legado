@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.DisplayMetrics
 import android.view.View
@@ -126,10 +127,20 @@ class WelcomeConfigFragment : PreferenceFragment(),
             runCatching {
                 val windowManager =
                     requireContext().getSystemService(Context.WINDOW_SERVICE) as WindowManager
-                val displayMetrics = DisplayMetrics()
-                windowManager.defaultDisplay.getRealMetrics(displayMetrics)
-                val screenWidth: Int = displayMetrics.widthPixels
-                val screenHeight: Int = displayMetrics.heightPixels
+                val screenWidth: Int
+                val screenHeight: Int
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val windowMetrics = windowManager.currentWindowMetrics
+                    val bounds = windowMetrics.bounds
+                    screenWidth = bounds.width()
+                    screenHeight = bounds.height()
+                } else {
+                    val displayMetrics = DisplayMetrics()
+                    @Suppress("DEPRECATION")
+                    windowManager.defaultDisplay.getRealMetrics(displayMetrics)
+                    screenWidth = displayMetrics.widthPixels
+                    screenHeight = displayMetrics.heightPixels
+                }
 
                 // 使用BitmapFactory.Options来优化图片解码，避免加载整个图片
                 val op = BitmapFactory.Options()

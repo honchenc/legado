@@ -1,6 +1,7 @@
 package io.legado.app.help
 
 import android.content.Intent
+import android.net.Uri
 import android.webkit.WebSettings
 import androidx.annotation.Keep
 import cn.hutool.core.codec.Base64
@@ -10,10 +11,13 @@ import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppConst.dateFormat
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.BaseSource
+import io.legado.app.data.entities.BookSource
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.http.BackstageWebView
+import io.legado.app.model.webBook.WebBook
 import io.legado.app.help.http.CookieManager.cookieJarHeader
 import io.legado.app.help.http.CookieStore
 import io.legado.app.help.http.SSLHelper
@@ -52,6 +56,8 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import okio.use
 import org.jsoup.Connection
@@ -1040,4 +1046,120 @@ interface JsExtensions : JsEncodeUtils {
     }
 
     fun startJsActivity(action: Function) = startJsActivity(action, true)
+
+    /**
+     * 并发测试多个URL，返回每个URL的响应和时间
+     */
+    fun ajaxTestAll(urlList: Array<String>): Array<Map<String, Any>> {
+        return runBlocking(context) {
+            urlList.map { url ->
+                async {
+                    val startTime = System.currentTimeMillis()
+                    try {
+                        val analyzeUrl = AnalyzeUrl(url, source = getSource(), coroutineContext = context)
+                        val response = analyzeUrl.getStrResponseAwait()
+                        val duration = System.currentTimeMillis() - startTime
+                        mapOf(
+                            "url" to url,
+                            "success" to true,
+                            "duration" to duration,
+                            "body" to (response.body ?: "")
+                        )
+                    } catch (e: Exception) {
+                        val duration = System.currentTimeMillis() - startTime
+                        mapOf(
+                            "url" to url,
+                            "success" to false,
+                            "duration" to duration,
+                            "error" to (e.localizedMessage ?: e.stackTraceStr)
+                        )
+                    }
+                }
+            }.awaitAll().toTypedArray()
+        }
+    }
+
+    /**
+     * 刷新书籍信息
+     */
+    fun refreshBookInfo(bookUrl: String): Boolean {
+        rhinoContext.ensureActive()
+        return runBlocking(context) {
+            kotlin.runCatching {
+                val source = getSource() as? BookSource ?: return@runBlocking false
+                val book = appDb.bookDao.getBook(bookUrl) ?: return@runBlocking false
+                WebBook.getBookInfoAwait(source, book)
+                appDb.bookDao.update(book)
+                true
+            }.getOrDefault(false)
+        }
+    }
+
+    /**
+     * 刷新目录
+     */
+    fun refreshBookToc(bookUrl: String): Boolean {
+        rhinoContext.ensureActive()
+        return runBlocking(context) {
+            kotlin.runCatching {
+                val source = getSource() as? BookSource ?: return@runBlocking false
+                val book = appDb.bookDao.getBook(bookUrl) ?: return@runBlocking false
+                val result = WebBook.getChapterListAwait(source, book)
+                result.getOrThrow()
+                true
+            }.getOrDefault(false)
+        }
+    }
+
+    /**
+     * 刷新章节内容
+     */
+    fun refreshContent(bookUrl: String, chapterIndex: Int): String? {
+        rhinoContext.ensureActive()
+        return runBlocking(context) {
+            kotlin.runCatching {
+                val source = getSource() as? BookSource ?: return@runBlocking null
+                val book = appDb.bookDao.getBook(bookUrl) ?: return@runBlocking null
+                val chapter = appDb.bookChapterDao.getChapter(bookUrl, chapterIndex)
+                    ?: return@runBlocking null
+                WebBook.getContentAwait(source, book, chapter)
+            }.getOrNull()
+        }
+    }
+
+    fun refreshContent(bookUrl: String, chapterTitle: String): String? {
+        rhinoContext.ensureActive()
+        return runBlocking(context) {
+            kotlin.runCatching {
+                val source = getSource() as? BookSource ?: return@runBlocking null
+                val book = appDb.bookDao.getBook(bookUrl) ?: return@runBlocking null
+                val chapter = appDb.bookChapterDao.getChapter(bookUrl, chapterTitle)
+                    ?: return@runBlocking null
+                WebBook.getContentAwait(source, book, chapter)
+            }.getOrNull()
+        }
+    }
+
+    /**
+     * 打开浏览器页面
+     */
+    fun showBrowser(url: String, title: String): StrResponse {
+        return startBrowserAwait(url, title)
+    }
+
+    /**
+     * 显示图片
+     */
+    fun showPhoto(url: String) {
+        rhinoContext.ensureActive()
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(Uri.parse(url), "image/*")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            appCtx.startActivity(intent)
+        } catch (e: Exception) {
+            AppLog.put("showPhoto error", e)
+        }
+    }
 }

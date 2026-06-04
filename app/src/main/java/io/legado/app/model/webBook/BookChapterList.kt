@@ -131,10 +131,13 @@ object BookChapterList {
             Context.enter().use {
                 val bindings = ScriptBindings()
                 bindings["gInt"] = 0
+                var prevTitle = ""
                 list.forEachIndexed { index, bookChapter ->
                     bindings["index"] = index + 1
                     bindings["chapter"] = bookChapter
                     bindings["title"] = bookChapter.title
+                    bindings["prevTitle"] = prevTitle
+                    bindings["prevLength"] = prevTitle.length
                     RhinoScriptEngine.runCatching {
                         eval(formatJs, bindings)?.toString()?.let {
                             bookChapter.title = it
@@ -142,6 +145,7 @@ object BookChapterList {
                     }.onFailure {
                         Debug.log(book.origin, "格式化标题出错, ${it.localizedMessage}")
                     }
+                    prevTitle = bookChapter.title
                 }
             }
         }

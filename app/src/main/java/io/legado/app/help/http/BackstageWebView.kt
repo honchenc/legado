@@ -48,6 +48,7 @@ class BackstageWebView(
     private val mHandler = Handler(Looper.getMainLooper())
     private var callback: Callback? = null
     private var mWebView: WebView? = null
+    private var mPooledWebView: PooledWebView? = null
 
     suspend fun getStrResponse(): StrResponse = withTimeout(timeLimit) {
         suspendCancellableCoroutine { block ->
@@ -107,7 +108,9 @@ class BackstageWebView(
 
     @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
     private fun createWebView(): WebView {
-        val webView = WebView(appCtx)
+        val pwv = WebViewPool.checkout()
+        val webView = pwv.webView
+        mPooledWebView = pwv
         val settings = webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
@@ -123,7 +126,8 @@ class BackstageWebView(
     }
 
     private fun destroy() {
-        mWebView?.destroy()
+        mPooledWebView?.let { WebViewPool.checkin(it) }
+        mPooledWebView = null
         mWebView = null
     }
 
