@@ -102,6 +102,13 @@ import io.legado.app.utils.visible
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.view.ViewGroup
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import io.legado.app.help.http.PooledWebView
+import io.legado.app.help.http.WebViewPool
+import io.legado.app.utils.openUrl
 import splitties.views.onClick
 import splitties.views.onLongClick
 
@@ -163,6 +170,7 @@ class BookInfoActivity :
     private var chapterChanged = false
     private val waitDialog by lazy { WaitDialog.from(this) }
     private var editMenuItem: MenuItem? = null
+    private var pooledWebView: PooledWebView? = null
 
     override val binding by viewBinding(ActivityBookInfoBinding::inflate)
     override val viewModel by viewModels<BookInfoViewModel>()
@@ -328,7 +336,7 @@ class BookInfoActivity :
         tvAuthor.text = book.getRealAuthor()
         tvOrigin.text = book.originName
         tvLasted.text = getString(R.string.lasted_show, book.latestChapterTitle)
-        tvIntro.text = book.getDisplayIntro()
+        showBookIntro(book)
         tvToc.visible(!book.isWebFile)
         upTvBookshelf()
         upKinds(book)
@@ -473,6 +481,61 @@ class BookInfoActivity :
                 }
             }
             flexboxLayout.addView(root)
+        }
+    }
+
+    private fun showBookIntro(book: Book) {
+        val intro = book.getDisplayIntro()
+        if (intro?.startsWith("<useweb>") == true) {
+            val lastIndex = intro.lastIndexOf("<")
+            if (lastIndex < 8) {
+                binding.tvIntro.visibility = android.view.View.VISIBLE
+                binding.tvIntro.text = intro
+                return
+            }
+            val html = intro.substring(8, lastIndex)
+            releaseWebView()
+            val pwv = WebViewPool.checkout().also { pooledWebView = it }
+            val webView = pwv.webView
+            webView.webViewClient = CustomWebViewClient()
+            binding.tvIntro.visibility = android.view.View.GONE
+            binding.tvIntroContainer!!.addView(
+                webView,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            val bookUrl = viewModel.getBook()?.bookUrl
+                ?.takeIf { it.startsWith("http", true) }
+                ?.substringBefore(",")
+            webView.loadDataWithBaseURL(bookUrl, html, "text/html", "utf-8", bookUrl)
+            return
+        }
+        releaseWebView()
+        if (intro.isNullOrBlank()) return
+        binding.tvIntro.text = intro
+    }
+
+    private fun releaseWebView() {
+        pooledWebView?.let { pwv ->
+            if (pwv.webView.parent != null) {
+                binding.tvIntroContainer!!.removeView(pwv.webView)
+            }
+            WebViewPool.checkin(pwv)
+            pooledWebView = null
+        }
+    }
+
+    inner class CustomWebViewClient : WebViewClient() {
+        override fun shouldOverrideUrlLoading(
+            view: WebView?,
+            request: WebResourceRequest?
+        ): Boolean {
+            request?.url?.let { uri ->
+                if (uri.scheme?.startsWith("http") == true) return false
+                this@BookInfoActivity.openUrl(uri)
+                return true
+            }
+            return true
         }
     }
 
@@ -743,6 +806,11 @@ class BookInfoActivity :
                 upTvBookshelf()
             }
         }
+    }
+
+    override fun onDestroy() {
+        releaseWebView()
+        super.onDestroy()
     }
 
     private fun upWaitDialogStatus(isShow: Boolean) {

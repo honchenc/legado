@@ -164,22 +164,29 @@
                     android:visibility="gone"
                     app:layout_constraintTop_toBottomOf="@id/ll_actions" />
 
-                <io.legado.app.ui.widget.text.ScrollTextView
-                    android:id="@+id/tv_intro"
+                <FrameLayout
+                    android:id="@+id/tv_intro_container"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:paddingLeft="16dp"
-                    android:paddingRight="8dp"
-                    android:paddingBottom="8dp"
-                    android:text="@string/book_intro"
-                    android:textColor="@color/secondaryText"
-                    android:textIsSelectable="true"
-                    android:textSize="14sp"
-                    android:visibility="visible"
-                    app:layout_constraintTop_toBottomOf="@id/lb_kind"
-                    tools:ignore="RtlHardcoded,RtlSymmetry" />
+                    app:layout_constraintTop_toBottomOf="@id/lb_kind">
+
+                    <io.legado.app.ui.widget.text.ScrollTextView
+                        android:id="@+id/tv_intro"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:paddingLeft="16dp"
+                        android:paddingRight="8dp"
+                        android:paddingBottom="8dp"
+                        android:text="@string/book_intro"
+                        android:textColor="@color/secondaryText"
+                        android:textIsSelectable="true"
+                        android:textSize="14sp"
+                        android:visibility="visible"
+                        tools:ignore="RtlHardcoded,RtlSymmetry" />
+
+                </FrameLayout>
 
             </androidx.constraintlayout.widget.ConstraintLayout>
 
