@@ -1,9 +1,8 @@
-#更新fork
+# 更新 fork (上游原始仓库已清库，改为手动触发)
 name: update fork
 
-on: 
-  schedule:
-    - cron: '0 16 * * *' #0点定时任务
+on:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,7 +17,7 @@ jobs:
         git config --global user.name "github-actions"
     - name: Update fork
       run: |
-        git remote add upstream https://github.com/gedoor/legado.git
+        git remote add upstream https://github.com/huajideshutiao/legado.git
         git remote -v
         git fetch upstream
         git checkout master
