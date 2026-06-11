@@ -6,12 +6,6 @@
 
     <group android:id="@+id/menu_group_on_line">
         <item
-            android:id="@+id/menu_change_source"
-            android:icon="@drawable/ic_exchange"
-            android:title="@string/change_origin"
-            app:showAsAction="always" />
-
-        <item
             android:id="@+id/menu_refresh"
             android:icon="@drawable/ic_refresh_black_24dp"
             android:title="@string/refresh"
@@ -31,12 +25,11 @@
         app:showAsAction="never" />
 
     <item
-        android:id="@+id/menu_disable_manga_scale"
+        android:id="@+id/menu_hide_manga_title"
         android:checkable="true"
         android:checked="false"
-        android:title="@string/disable_manga_scale"
+        android:title="@string/hide_manga_title"
         app:showAsAction="never" />
-
     <item
         android:id="@+id/menu_enable_auto_page"
         android:checkable="true"
@@ -85,13 +78,6 @@
     <item
         android:id="@+id/menu_manga_color_filter"
         android:title="@string/manga_color_filter"
-        app:showAsAction="never" />
-
-    <item
-        android:id="@+id/menu_hide_manga_title"
-        android:checkable="true"
-        android:checked="false"
-        android:title="@string/hide_manga_title"
         app:showAsAction="never" />
 
     <item

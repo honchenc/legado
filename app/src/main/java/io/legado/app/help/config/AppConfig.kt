@@ -467,6 +467,10 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
 
     val showAddToShelfAlert get() = appCtx.getPrefBoolean(PreferKey.showAddToShelfAlert, true)
 
+    var bookInfoDeleteAlert
+        get() = appCtx.getPrefBoolean(PreferKey.bookInfoDeleteAlert, true)
+        set(value) = appCtx.putPrefBoolean(PreferKey.bookInfoDeleteAlert, value)
+
     val ignoreAudioFocus get() = appCtx.getPrefBoolean(PreferKey.ignoreAudioFocus, false)
 
     var pauseReadAloudWhilePhoneCalls
@@ -579,13 +583,6 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     //直接跳转到视频界面，忽略详情
     val devFeat: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.devFeat, false)
-
-    //禁用漫画缩放
-    var disableMangaScale: Boolean
-        get() = appCtx.getPrefBoolean(PreferKey.disableMangaScale, true)
-        set(value) {
-            appCtx.putPrefBoolean(PreferKey.disableMangaScale, value)
-        }
 
     var disableMangaPageAnim: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.disableMangaPageAnim, false)

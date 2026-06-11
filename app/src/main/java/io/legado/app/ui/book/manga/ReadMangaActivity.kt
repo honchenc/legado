@@ -27,12 +27,9 @@ import io.legado.app.base.BaseReadActivity
 import io.legado.app.constant.AppConst.imagePathKey
 import io.legado.app.constant.EventBus
 import io.legado.app.data.entities.Book
-import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookProgress
-import io.legado.app.data.entities.BookSource
 import io.legado.app.databinding.ActivityMangaBinding
 import io.legado.app.help.IntentData
-import io.legado.app.help.book.isImage
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.storage.Backup
 import io.legado.app.lib.dialogs.alert
@@ -41,7 +38,6 @@ import io.legado.app.lib.dialogs.okButton
 import io.legado.app.model.ReadTimeRecorder
 import io.legado.app.model.fileBook.CbzFile
 import io.legado.app.receiver.NetworkChangedListener
-import io.legado.app.ui.book.changesource.ChangeBookSourceDialog
 import io.legado.app.ui.book.info.BookInfoActivity
 import io.legado.app.ui.book.manga.config.MangaColorFilterConfig
 import io.legado.app.ui.book.manga.config.MangaColorFilterDialog
@@ -86,7 +82,7 @@ import java.text.DecimalFormat
 import kotlin.math.ceil
 
 class ReadMangaActivity : BaseReadActivity<ActivityMangaBinding, ReadMangaViewModel>(),
-    ChangeBookSourceDialog.CallBack, MangaMenu.CallBack,
+    MangaMenu.CallBack,
     MangaColorFilterDialog.Callback, ScrollTimer.ScrollCallback {
 
     override val currentBook: Book?
@@ -254,38 +250,31 @@ class ReadMangaActivity : BaseReadActivity<ActivityMangaBinding, ReadMangaViewMo
             itemAnimator = null
             layoutManager = mLayoutManager
             setHasFixedSize(true)
-            setDisableMangaScale(AppConfig.disableMangaScale)
             setRecyclerViewPreloader(AppConfig.mangaPreDownloadNum)
-            longTapListener = {
-                val centerPosition = findCenterViewPosition()
-                val item = mAdapter.getItem(centerPosition)
-                if (item is MangaPage) {
-                    saveImage(item.mImageUrl)
-                    true
-                } else {
-                    false
-                }
-            }
-            setPreScrollListener { _, _, _, position ->
-                if (mAdapter.isNotEmpty()) {
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                private var lastCenter = RecyclerView.NO_POSITION
+
+                override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
+                    val position = rv.findCenterViewPosition()
+                    if (position == RecyclerView.NO_POSITION || position == lastCenter) return
+                    lastCenter = position
+                    if (!mAdapter.isNotEmpty()) return
                     val item = mAdapter.getItem(position)
-                    if (item is BaseMangaPage) {
-                        if (viewModel.durChapterIndex < item.chapterIndex) {
-                            viewModel.moveToNextChapter()
-                        } else if (viewModel.durChapterIndex > item.chapterIndex) {
-                            viewModel.moveToPrevChapter()
-                        } else {
-                            viewModel.durChapterPos = item.index
-                            viewModel.curPageChanged()
-                        }
-                        if (item is MangaPage) {
-                            binding.mangaMenu.upSeekBar(item.index, item.imageCount)
-                            upInfoBar(item)
-                        }
+                    if (item !is BaseMangaPage) return
+                    if (viewModel.durChapterIndex < item.chapterIndex) {
+                        viewModel.moveToNextChapter()
+                    } else if (viewModel.durChapterIndex > item.chapterIndex) {
+                        viewModel.moveToPrevChapter()
+                    } else {
+                        viewModel.durChapterPos = item.index
+                        viewModel.curPageChanged()
+                    }
+                    if (item is MangaPage) {
+                        binding.mangaMenu.upSeekBar(item.index, item.imageCount)
+                        upInfoBar(item)
                     }
                 }
-            }
-            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+
                 override fun onScrollStateChanged(rv: RecyclerView, newState: Int) {
                     //仅在滚动彻底停止后，才让停稳的居中页 GIF 从第一帧单次播放并准备翻页，
                     //其余页恢复无限循环。这样可避免预布局/滑动途中误装填导致提前播完、停在末帧。
@@ -298,6 +287,16 @@ class ReadMangaActivity : BaseReadActivity<ActivityMangaBinding, ReadMangaViewMo
         binding.webtoonFrame.run {
             onAction {
                 click(it)
+            }
+            longTapListener = {
+                val centerPosition = binding.recyclerView.findCenterViewPosition()
+                val item = mAdapter.getItem(centerPosition)
+                if (item is MangaPage) {
+                    saveImage(item.mImageUrl)
+                    true
+                } else {
+                    false
+                }
             }
         }
     }
@@ -507,18 +506,6 @@ class ReadMangaActivity : BaseReadActivity<ActivityMangaBinding, ReadMangaViewMo
         scrollToNext()
     }
 
-    override val oldBook: Book?
-        get() = viewModel.curBook
-
-    override fun changeTo(source: BookSource, book: Book, toc: List<BookChapter>) {
-        if (book.isImage) {
-            binding.flLoading.isVisible = true
-            viewModel.changeTo(source, book, toc)
-        } else {
-            toastOnUi("所选择的源不是漫画源")
-        }
-    }
-
     override fun updateColorFilter(config: MangaColorFilterConfig) {
         mAdapter.setMangaImageColorFilter(config)
     }
@@ -546,13 +533,6 @@ class ReadMangaActivity : BaseReadActivity<ActivityMangaBinding, ReadMangaViewMo
     @SuppressLint("StringFormatMatches", "NotifyDataSetChanged")
     override fun onCompatOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
-            R.id.menu_change_source -> {
-                binding.mangaMenu.runMenuOut()
-                viewModel.curBook?.let {
-                    showDialogFragment(ChangeBookSourceDialog(it.name, it.author))
-                }
-            }
-
             R.id.menu_catalog -> {
                 IntentData.book = viewModel.curBook
                 IntentData.chapterList = viewModel.chapterListData.value
@@ -576,12 +556,6 @@ class ReadMangaActivity : BaseReadActivity<ActivityMangaBinding, ReadMangaViewMo
                     item.title = getString(R.string.pre_download_m, it)
                     setRecyclerViewPreloader(it)
                 }
-            }
-
-            R.id.menu_disable_manga_scale -> {
-                item.isChecked = !item.isChecked
-                AppConfig.disableMangaScale = item.isChecked
-                setDisableMangaScale(item.isChecked)
             }
 
             R.id.menu_enable_auto_page -> {
@@ -744,7 +718,6 @@ class ReadMangaActivity : BaseReadActivity<ActivityMangaBinding, ReadMangaViewMo
         this.mMenu = menu
         menu.findItem(R.id.menu_pre_manga_number).title =
             getString(R.string.pre_download_m, AppConfig.mangaPreDownloadNum)
-        menu.findItem(R.id.menu_disable_manga_scale).isChecked = AppConfig.disableMangaScale
         menu.findItem(R.id.menu_manga_auto_page_speed).title =
             getString(R.string.manga_auto_page_speed, AppConfig.mangaAutoPageSpeed)
         menu.findItem(R.id.menu_enable_horizontal_scroll).isChecked =
@@ -754,14 +727,6 @@ class ReadMangaActivity : BaseReadActivity<ActivityMangaBinding, ReadMangaViewMo
         menu.findItem(R.id.menu_manga_gif_auto_next).run {
             isVisible = AppConfig.enableMangaHorizontalScroll
             isChecked = AppConfig.enableMangaGifAutoNext
-        }
-    }
-
-    private fun setDisableMangaScale(disable: Boolean) {
-        binding.webtoonFrame.disableMangaScale = disable
-        binding.recyclerView.disableMangaScale = disable
-        if (disable) {
-            binding.recyclerView.resetZoom()
         }
     }
 
